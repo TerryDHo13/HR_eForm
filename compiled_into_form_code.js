@@ -1,3 +1,5 @@
+//!!IMPORTANT!! Ensure SHEETID is correct 
+//!!IMPORTANT!! Ensure that 'data' sheet contains the approver details, template ID and Folder ID
 const SHEETID = '1UPi073wOUf4uzO0VEDHY4zU1DT5CrQpbAnwIUvu4Xo0';
 const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('data');
 const data = sheet.getDataRange().getValues();
@@ -29,22 +31,24 @@ function App() {
   this.form = FormApp.getActiveForm();
   this.formUrl = this.form.getPublishedUrl();
   this.url =
-    "https://script.google.com/macros/s/AKfycbxMGDGGVOkE1Icvd7aYWhudBSjHIZi45auB-Z_1sjhZ0Nb3yac9SDh-Q3DmyOcF6H7F/exec"; // IMPORTANT - copy the web app url after deploy
+    "https://script.google.com/macros/s/AKfycbxMGDGGVOkE1Icvd7aYWhudBSjHIZi45auB-Z_1sjhZ0Nb3yac9SDh-Q3DmyOcF6H7F/exec";
+  //!!IMPORTANT!! - copy the web app url after deploy
   this.title = this.form.getTitle();
   this.sheetname = "Form Responses 1"; // DO NOT change - the default google form responses sheet name
-  this.flowHeader = "Department"; // IMPORTANT - key field for your flows
+  this.flowHeader = "Department"; //!!IMPORTANT!! - key field for your flows
   this.uidHeader = "UID";
   this.uidPrefix = "UID-";
   this.uidLength = 5;
   this.statusHeader = "Status";
   this.responseIdHeader = "_response_id";
+  this.documentLink = "Document Link";
   this.emailHeader = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
 
   this.pending = "Pending";
   this.approved = "Approved";
   this.rejected = "Rejected";
   this.waiting = "Waiting";
-
+  //onOpen();
 
   //Get the details of the spreadsheet
   this.sheet = (() => {
@@ -100,6 +104,7 @@ function App() {
 
     let task, approver, nextApprover, column, approvers, email, status, responseId;
 
+    //If record is obtained, extract details
     if (record) {
       task = record.slice(0, headers.indexOf(this.statusHeader) + 1).map((item, i) => {
         return {
@@ -121,7 +126,7 @@ function App() {
 
   //Get response from spreadsheet based on ID
   this.getResponseById = (id) => {
-    
+
     const values = this.parsedValues();
     const record = values.find((value) => value.some((cell) => cell === id));
 
@@ -129,6 +134,7 @@ function App() {
 
     let task, approvers, status;
 
+    //If record is obtained, extract details
     if (record) {
       task = record.slice(0, headers.indexOf(this.statusHeader) + 1).map((item, i) => {
         return {
@@ -184,7 +190,7 @@ function App() {
 
   //Sends a notification 
   this.sendNotification = (taskId) => {
- 
+
     const { email, responseId, status, task, approvers } = this.getTaskById(taskId);
     console.log({ email, status, task, approvers });
 
@@ -211,8 +217,7 @@ function App() {
     GmailApp.sendEmail(email, subject, "", options);
   };
 
-  //IMPORTANT PROCESS
-  // add addtional data to form response when update
+  //!!IMPORTANT PROCESS!!
   //Handles the form submission and approval workflow
   this.onFormSubmit = () => {
 
@@ -250,6 +255,10 @@ function App() {
       }
       newValues.push(JSON.stringify(item));
     });
+
+    newHeaders.push(this.documentLink);
+    // Add an empty string as the Document Link value
+    newValues.push("");
 
     this.sheet
       .getRange(1, startColumn, 1, newHeaders.length)
@@ -386,15 +395,41 @@ function createTrigger() {
     .create();
 }
 
-function onOpen(){
+//Custom menu on Google Form
+function onOpen() {
   const ui = FormApp.getUi();
   const menu = ui.createMenu('AutoFill Docs');
   menu.addItem('Create New Docs', 'createNewGoogleDocs')
   menu.addToUi();
 }
 
+//Replace the placeholders in the template with data from spreadsheet
+function replacePlaceholdersInDocument(body, placeholderMap) {
+  for (const placeholder in placeholderMap) {
+    if (placeholderMap.hasOwnProperty(placeholder)) {
+      body.replaceText(placeholder, placeholderMap[placeholder]);
+    }
+  }
+}
 
-function createNewGoogleDocs(){
+//Replace the approver placeholders in the template with data from spreadsheet
+function replaceApproverPlaceholders(body, approverData, placeholderPrefix) {
+  const replacements = {
+    name: approverData.name,
+    title: approverData.title,
+    status: approverData.status,
+    comments: approverData.comments === null ? "" : approverData.comments,
+    timestamp: new Date(approverData.timestamp).toLocaleDateString(),
+  };
+
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    const fullPlaceholder = `{${placeholderPrefix}.${placeholder}}`;
+    body.replaceText(fullPlaceholder, value);
+  }
+}
+
+//Creates the Google Docs using data from spreadsheet
+function createNewGoogleDocs() {
   //!!IMPORTANT!! Ensure that the template and folder ID are entered in the row and column of the 'data' sheet
   const googleDocTemplateID = data[0][4];
   const folderID = data[1][4];
@@ -408,79 +443,51 @@ function createNewGoogleDocs(){
   //Get all of the values as a 2D array
   const rows = sheet.getDataRange().getValues();
 
+  const headers = rows[0];
+
+  const _headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  // Get the number of headers
+  const numberOfHeaders = _headers.length;
+
   //Processing each spreadsheet row
   rows.forEach(function (row, index) {
+
+    //Extract headers from spreadsheet
+    const placeholderMap = {};
+    headers.forEach((header, index) => {
+      const placeholder = `{${header}}`;
+      placeholderMap[placeholder] = row[index];
+    });
+    const numberOfPlaceholders = Object.keys(placeholderMap).length;
+    console.log('Number of placeholders ' + numberOfPlaceholders);
 
     //Check if this row is the headers. If so, skip it
     if (index === 0) return;
 
     //Check if document link has been generated. If so, skip it
-    if (row[22]) return;
+    if (row[numberOfPlaceholders-1]) return;
 
     //Title of the document in our destinationFolder
-    const copy = googleDocTemplate.makeCopy(`${row[1]}, ${row[2]} MANPOWER REQUISITION FORM`, destinationFolder)
+    const copy = googleDocTemplate.makeCopy(`${placeholderMap['{Name:}']}, ${placeholderMap['{Date:}']} MANPOWER REQUISITION FORM`, destinationFolder)
 
-    //Once we have the copy, we then open it using the DocumentApp
     const doc = DocumentApp.openById(copy.getId())
-    //All of the content lives in the body, so we get that for editing
     const body = doc.getBody();
+    replacePlaceholdersInDocument(body, placeholderMap);
 
-    //In these lines, replace our replacement tokens with values from our spreadsheet row
-    body.replaceText('{Timestamp}', row[0]);
-    body.replaceText('{Email Address}', row[16]);
-    body.replaceText('{No. of staff requested:}', row[3]);
-    body.replaceText('{Required Date:}', row[4]);
-    body.replaceText('{Position:}', row[5]);
-    body.replaceText('{Grade:}', row[6]);
-    body.replaceText('{Department:}', row[7]);
-    body.replaceText('{Division:}', row[8]);
-    body.replaceText('{Report to:}', row[9]);
-    body.replaceText('{Is this position:}', row[10]);
-    body.replaceText('{Is this position:}', row[11]);
-    body.replaceText('{Salary Range:}', row[12]);
-    body.replaceText('{Qualification:}', row[13]);
-    body.replaceText('{Working experience:}', row[14]);
-    body.replaceText('{Practical skill:}', row[15]);
-    body.replaceText('{Name:}', row[1]);
-    body.replaceText('{Date:}', row[2]);
-    body.replaceText('{_uid}', row[17]);
-    body.replaceText('{_status}', row[18]);
+    // //Approver details for approver 1
+    const approverHeader1 = '_approver_1';
+    const _approver_1 = JSON.parse(placeholderMap[`{${approverHeader1}}`]);
+    replaceApproverPlaceholders(body, _approver_1, approverHeader1);
 
-    //Approver details for approver 1
-    var _approver_1 = JSON.parse(row[20])
-    body.replaceText('{_approver_1."name"}', _approver_1.name);
-    body.replaceText('{_approver_1."title"}', _approver_1.title);
-    body.replaceText('{_approver_1."status"}', _approver_1.status);
+    // // //Approver details for approver 2
+    const approverHeader2 = '_approver_2';
+    const _approver_2 = JSON.parse(placeholderMap[`{${approverHeader2}}`]);
+    replaceApproverPlaceholders(body, _approver_2, approverHeader2);
 
-    if (_approver_1.comments === null) {
-      body.replaceText('{_approver_1."comments"}', "");
-    } else {
-      body.replaceText('{_approver_1."comments"}', _approver_1.comments);
-    }
-
-    const formatted_approver_1_timestamp = new Date(_approver_1.timestamp).toLocaleDateString();
-    body.replaceText('{_approver_1."timestamp"}', formatted_approver_1_timestamp);
-
-    //Approver details for approver 2
-    var _approver_2 = JSON.parse(row[21])
-    body.replaceText('{_approver_2."name"}', _approver_2.name);
-    body.replaceText('{_approver_2."title"}', _approver_2.title);
-    body.replaceText('{_approver_2."status"}', _approver_2.status);
-
-    if (_approver_2.comments === null) {
-      body.replaceText('{_approver_2."comments"}', "");
-    } else {
-      body.replaceText('{_approver_2."comments"}', _approver_2.comments);
-    }
-
-    const formatted_approver_2_timestamp = new Date(_approver_2.timestamp).toLocaleDateString();
-    body.replaceText('{_approver_2."timestamp"}', formatted_approver_2_timestamp);
-
-    //We make our changes permanent by saving and closing the document
     doc.saveAndClose();
-    //Store the url of our new document in a variable
     const url = doc.getUrl();
-    //Write that value back to the 'Document Link' column in the spreadsheet. 
-    sheet.getRange(index + 1, 23).setValue(url)
+
+    sheet.getRange(index + 1, numberOfPlaceholders).setValue(url)
   })
 }
