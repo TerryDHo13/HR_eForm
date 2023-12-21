@@ -1,37 +1,43 @@
 //!!IMPORTANT!! Ensure SHEETID is correct 
 //!!IMPORTANT!! Ensure that 'data' sheet contains the approver details, template ID and Folder ID
-const SHEETID = '1UPi073wOUf4uzO0VEDHY4zU1DT5CrQpbAnwIUvu4Xo0';
+const SHEETID = '1OXSB4nOj8Oh5jvjOxzONw50GNAc8X0gU4nY6QyhSyyc';
 const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('data');
 const data = sheet.getDataRange().getValues();
+numOfApprovers = 0;
 
-const testing_0 = data[0][0];
-const testing_1 = data[0][1];
-const testing_2 = data[0][2];
-const testing_3 = data[1][0];
-const testing_4 = data[1][1];
-const testing_5 = data[1][2];
+const headers = data[0];
 
-// Define the approval flows in this object
+//Columns for email, name, and title
+const emailColumn = headers.indexOf('Email');
+const nameColumn = headers.indexOf('Name');
+const titleColumn = headers.indexOf('Title');
+
+//Extract approval flows from the "data" sheet
+function extractFlows(data) {
+  const flows = [];
+  var numOfApproverRequired = data[1][6]
+
+  for (let i = 1; i <= numOfApproverRequired; i++) {
+    const flow = {
+      email: data[i][emailColumn],
+      name: data[i][nameColumn],
+      title: data[i][titleColumn],
+    };
+    flows.push(flow);
+    numOfApprovers += 1;
+  }
+  return flows;
+}
+
 const FLOWS = {
-  defaultFlow: [
-    {
-      email: testing_0,
-      name: testing_1,
-      title: testing_2,
-    },
-    {
-      email: testing_3,
-      name: testing_4,
-      title: testing_5,
-    },
-  ],
+  defaultFlow: extractFlows(data),
 };
 
 function App() {
   this.form = FormApp.getActiveForm();
   this.formUrl = this.form.getPublishedUrl();
   this.url =
-    "https://script.google.com/macros/s/AKfycbxMGDGGVOkE1Icvd7aYWhudBSjHIZi45auB-Z_1sjhZ0Nb3yac9SDh-Q3DmyOcF6H7F/exec";
+    "https://script.google.com/macros/s/AKfycbwY3IDPzi1DvqRfxpGaf5-9bLwgY6gBQvkVOANMVcSGYXnfzCqxWUnL5xBCpS-ayr0d/exec";
   //!!IMPORTANT!! - copy the web app url after deploy
   this.title = this.form.getTitle();
   this.sheetname = "Form Responses 1"; // DO NOT change - the default google form responses sheet name
@@ -48,7 +54,8 @@ function App() {
   this.approved = "Approved";
   this.rejected = "Rejected";
   this.waiting = "Waiting";
-  //onOpen();
+
+  console.log(FLOWS);
 
   //Get the details of the spreadsheet
   this.sheet = (() => {
@@ -164,6 +171,11 @@ function App() {
     );
   };
 
+  this.resetUid = () => {
+    const props = PropertiesService.getDocumentProperties();
+    props.deleteProperty(this.uidHeader);
+  };
+
   //Creates and sends the approval email to approver
   this.sendApproval = ({ task, approver, approvers }) => {
 
@@ -256,8 +268,8 @@ function App() {
       newValues.push(JSON.stringify(item));
     });
 
+    //Add "Document Link" header at the end
     newHeaders.push(this.documentLink);
-    // Add an empty string as the Document Link value
     newValues.push("");
 
     this.sheet
@@ -378,6 +390,11 @@ function doGet(_event) {
   return htmlOutput;
 }
 
+function resetUid() {
+  const app = new App();
+  app.resetUid();
+}
+
 //Create a trigger for the form submission
 function createTrigger() {
   const functionName = "_onFormSubmit";
@@ -396,11 +413,14 @@ function createTrigger() {
 }
 
 //Custom menu on Google Form
-function onOpen() {
-  const ui = FormApp.getUi();
-  const menu = ui.createMenu('AutoFill Docs');
-  menu.addItem('Create New Docs', 'createNewGoogleDocs')
-  menu.addToUi();
+function onOpen(e) {
+  FormApp.getUi()
+    .createMenu('Other features')
+    .addItem('Create New Docs', 'createNewGoogleDocs')
+    .addItem('Reset UID', 'resetUid')
+    .addItem('Convert Google Docs to PDFs', 'convertGoogleDocsToPDFs')
+    .addItem('Sync with Google Sheet', 'syncFormWithSheet')
+    .addToUi();
 }
 
 //Replace the placeholders in the template with data from spreadsheet
@@ -431,7 +451,7 @@ function replaceApproverPlaceholders(body, approverData, placeholderPrefix) {
 //Creates the Google Docs using data from spreadsheet
 function createNewGoogleDocs() {
   //!!IMPORTANT!! Ensure that the template and folder ID are entered in the row and column of the 'data' sheet
-  const googleDocTemplateID = data[0][4];
+  const googleDocTemplateID = data[1][3];
   const folderID = data[1][4];
 
   const googleDocTemplate = DriveApp.getFileById(googleDocTemplateID);
@@ -445,11 +465,6 @@ function createNewGoogleDocs() {
 
   const headers = rows[0];
 
-  const _headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-
-  // Get the number of headers
-  const numberOfHeaders = _headers.length;
-
   //Processing each spreadsheet row
   rows.forEach(function (row, index) {
 
@@ -460,34 +475,57 @@ function createNewGoogleDocs() {
       placeholderMap[placeholder] = row[index];
     });
     const numberOfPlaceholders = Object.keys(placeholderMap).length;
-    console.log('Number of placeholders ' + numberOfPlaceholders);
 
     //Check if this row is the headers. If so, skip it
     if (index === 0) return;
 
     //Check if document link has been generated. If so, skip it
-    if (row[numberOfPlaceholders-1]) return;
+    if (row[numberOfPlaceholders - 1]) return;
 
     //Title of the document in our destinationFolder
-    const copy = googleDocTemplate.makeCopy(`${placeholderMap['{Name:}']}, ${placeholderMap['{Date:}']} MANPOWER REQUISITION FORM`, destinationFolder)
+    const copy = googleDocTemplate.makeCopy(`${placeholderMap['{Name:}']}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} MANPOWER REQUISITION FORM`, destinationFolder)
 
     const doc = DocumentApp.openById(copy.getId())
     const body = doc.getBody();
     replacePlaceholdersInDocument(body, placeholderMap);
 
-    // //Approver details for approver 1
-    const approverHeader1 = '_approver_1';
-    const _approver_1 = JSON.parse(placeholderMap[`{${approverHeader1}}`]);
-    replaceApproverPlaceholders(body, _approver_1, approverHeader1);
-
-    // // //Approver details for approver 2
-    const approverHeader2 = '_approver_2';
-    const _approver_2 = JSON.parse(placeholderMap[`{${approverHeader2}}`]);
-    replaceApproverPlaceholders(body, _approver_2, approverHeader2);
+    //Get details of the approvers
+    for (let i = 1; i <= numOfApprovers; i++) {
+      const approverHeader = `_approver_${i}`;
+      const _approver_ = JSON.parse(placeholderMap[`{${approverHeader}}`]);
+      replaceApproverPlaceholders(body, _approver_, approverHeader);
+    }
 
     doc.saveAndClose();
     const url = doc.getUrl();
 
     sheet.getRange(index + 1, numberOfPlaceholders).setValue(url)
   })
+}
+
+function convertGoogleDocsToPDFs() {
+  //Initialize Data folder ID and PDF folder ID
+  const datafolderID = data[1][4];
+  const pdfFolderID = data[1][5];
+
+  const dataFolder = DriveApp.getFolderById(datafolderID)
+  const pdfFolder = DriveApp.getFolderById(pdfFolderID);
+
+  console.log('PDF Folder ID: ' + pdfFolder);
+  console.log('Data Folder ID: ' + dataFolder);
+
+  const invoices = dataFolder.getFiles();
+  console.log('Files: ' + invoices);
+
+  while (invoices.hasNext()) {
+    var invoice = invoices.next();
+    var id = invoice.getId();
+    var file = DriveApp.getFileById(id);
+    var PDFblob = file.getAs(MimeType.PDF);
+    var PDF = pdfFolder.createFile(PDFblob);
+  }
+}
+
+function syncFormWithSheet() {
+  //When pressed, sync the question from Google Form with Spreadsheet header
 }
