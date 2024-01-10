@@ -197,7 +197,8 @@ function App() {
 
     const options = { htmlBody: template_approval.evaluate().getContent() };
 
-    GmailApp.sendEmail(approver.email, subject, "", options);
+    //Edited to from GmailApp to MailApp
+    MailApp.sendEmail(approver.email, subject, "", options);
   };
 
   //Sends a notification 
@@ -226,7 +227,8 @@ function App() {
 
     const options = { htmlBody: template_notification.evaluate().getContent() };
 
-    GmailApp.sendEmail(email, subject, "", options);
+    //Edited to from GmailApp to MailApp
+    MailApp.sendEmail(email, subject, "", options);
   };
 
   //!!IMPORTANT PROCESS!!
@@ -517,15 +519,39 @@ function convertGoogleDocsToPDFs() {
   const invoices = dataFolder.getFiles();
   console.log('Files: ' + invoices);
 
+  const invoicesPDF = pdfFolder.getFiles();
+  console.log('PDF Files: ' + invoicesPDF);
+
+  var pdfNameArray = [];
+
+
+  while (invoicesPDF.hasNext()) {
+    var file = invoicesPDF.next();
+    var title = file.getName().replace('.pdf', '');
+    pdfNameArray.push(title);
+
+  }
+  console.log('PDF Names: ' + pdfNameArray);
+
+
   while (invoices.hasNext()) {
     var invoice = invoices.next();
-    var id = invoice.getId();
-    var file = DriveApp.getFileById(id);
-    var PDFblob = file.getAs(MimeType.PDF);
-    var PDF = pdfFolder.createFile(PDFblob);
-  }
-}
 
-function syncFormWithSheet() {
-  //When pressed, sync the question from Google Form with Spreadsheet header
+    var fileName = invoice.getName().replace('.pdf', '');
+    console.log(fileName);
+
+    if (pdfNameArray.includes(fileName)) {
+      console.log("The ID exists");
+    }
+    else {
+      console.log("The ID doesnt exist");
+      var id = invoice.getId();
+      var file = DriveApp.getFileById(id);
+
+      var PDFblob = file.getAs(MimeType.PDF);
+
+      var PDF = pdfFolder.createFile(PDFblob);
+
+    }
+  }
 }
