@@ -34,6 +34,7 @@ function extractFlows(data) {
   return flows;
 }
 
+//GAS Retry function
 function call(func, optLoggerFunction) {
   for (var n = 0; n < 6; n++) {
     try {
@@ -55,25 +56,16 @@ const FLOWS = {
 };
 
 function App() {
+  //If unable to get form detail and formUrl, retry 
   try {
     this.form = call(FormApp.getActiveForm);
     console.log(this.form);
 
     this.formUrl = call(this.form.getPublishedUrl);
     console.log(this.formUrl);
-    // Other code...
   } catch (e) {
     Logger.log("Error: " + e.toString());
-    // Handle the error or log more details.
   }
-  // try{
-  //   this.formUrl = call(this.form.getPublishedUrl);
-  //   console.log(this.formUrl);
-  // }catch (e) {
-  //   Logger.log("Error: " + e.toString());
-  //   // Handle the error or log more details.
-  // }
-  // this.formUrl = this.form.getPublishedUrl(); //error on server creation URL
   this.url = urlLink;
   this.title = this.form.getTitle();
   this.sheetname = "Form Responses 1"; // DO NOT change - the default google form responses sheet name
@@ -234,7 +226,6 @@ function App() {
   this.sendNotification = (taskId) => {
 
     const { email, responseId, status, task, approvers } = this.getTaskById(taskId);
-    console.log({ email, status, task, approvers });
 
     const template_notification = HtmlService.createTemplateFromFile(
       "notification_email.html"
@@ -276,18 +267,11 @@ function App() {
     const newHeaders = [this.uidHeader, this.statusHeader, this.responseIdHeader, this.documentLink];
     const newValues = [this.createUid(), this.pending, responseId, ""];
 
-    // newHeaders.push(this.documentLink);
-    // newValues.push("");
-
     const flow = FLOWS.defaultFlow;
-
-    // Utilities.sleep(3000);// Sleep for 3 second
 
     let taskId;
 
     flow.forEach((item, i) => {
-
-      // Utilities.sleep(3000);// Sleep for 3 second
 
       newHeaders.push("_approver_" + (i + 1));
 
@@ -391,8 +375,6 @@ function doGet(_event) {
   let template;
 
   const userEmail = Session.getActiveUser().getEmail();
-
-  console.log(userEmail);
 
   const isValid = validate(userEmail, validDomain);
 
@@ -533,7 +515,7 @@ function createNewGoogleDocs() {
 
     const documentLinkColumnIndex = headerMap['Document Link'];
     const documentLinkValue = row[documentLinkColumnIndex];
-    // console.log(row[documentLinkColumnIndex])
+
 
     // Check if this row is the headers. If so, skip it
     if (index === 0) return;
@@ -580,6 +562,7 @@ function createNewGoogleDocs() {
   })
 }
 
+//Create PDF from Google Docs
 function convertGoogleDocsToPDFs() {
   //Initialize Data folder ID and PDF folder ID
   const datafolderID = data[1][4];
@@ -588,14 +571,9 @@ function convertGoogleDocsToPDFs() {
   const dataFolder = DriveApp.getFolderById(datafolderID)
   const pdfFolder = DriveApp.getFolderById(pdfFolderID);
 
-  console.log('PDF Folder ID: ' + pdfFolder);
-  console.log('Data Folder ID: ' + dataFolder);
-
   const invoices = dataFolder.getFiles();
-  console.log('Files: ' + invoices);
 
   const invoicesPDF = pdfFolder.getFiles();
-  console.log('PDF Files: ' + invoicesPDF);
 
   var pdfNameArray = [];
 
@@ -606,8 +584,6 @@ function convertGoogleDocsToPDFs() {
     pdfNameArray.push(title);
 
   }
-  console.log('PDF Names: ' + pdfNameArray);
-
 
   while (invoices.hasNext()) {
     var invoice = invoices.next();
@@ -616,7 +592,6 @@ function convertGoogleDocsToPDFs() {
     console.log(fileName);
 
     if (pdfNameArray.includes(fileName)) {
-      console.log("The ID exists");
     }
     else {
       console.log("The ID doesnt exist");
