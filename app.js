@@ -1,50 +1,96 @@
-const SHEETID = '1UPi073wOUf4uzO0VEDHY4zU1DT5CrQpbAnwIUvu4Xo0';
+//!!IMPORTANT!! Ensure SHEETID is correct 
+//!!IMPORTANT!! Ensure that 'data' sheet contains the approver details, template ID and Folder ID
+//!!IMPORTANT!! - copy the web app url after deploy
+const SHEETID = 'YOUR_SHEET_ID';
+const urlLink = "YOUR_WEB_URL";
+const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
+const validDomain = 'YOUR_DOMAIN_NAME';
+
 const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('data');
 const data = sheet.getDataRange().getValues();
+numOfApprovers = 0;
 
-const testing_0 = data[0][0];
-const testing_1 = data[0][1];
-const testing_2 = data[0][2];
-const testing_3 = data[1][0];
-const testing_4 = data[1][1];
-const testing_5 = data[1][2];
+const headers = data[0];
 
-// Define the approval flows in this object
+//Columns for email, name, and title
+const emailColumn = headers.indexOf('Email');
+const nameColumn = headers.indexOf('Name');
+const titleColumn = headers.indexOf('Title');
+
+//Extract approval flows from the "data" sheet
+function extractFlows(data) {
+  const flows = [];
+  var numOfApproverRequired = data[1][6]
+
+  for (let i = 1; i <= numOfApproverRequired; i++) {
+    const flow = {
+      email: data[i][emailColumn],
+      name: data[i][nameColumn],
+      title: data[i][titleColumn],
+    };
+    flows.push(flow);
+    numOfApprovers += 1;
+  }
+  return flows;
+}
+
+function call(func, optLoggerFunction) {
+  for (var n = 0; n < 6; n++) {
+    try {
+      return func();
+    } catch (e) {
+      if (optLoggerFunction) {
+        optLoggerFunction("GASRetry " + n + ": " + e);
+      }
+      if (n == 5) {
+        throw e;
+      }
+      Utilities.sleep((Math.pow(2, n) * 1000) + (Math.round(Math.random() * 1000)));
+    }
+  }
+}
+
 const FLOWS = {
-  defaultFlow: [
-    {
-      email: testing_0,
-      name: testing_1,
-      title: testing_2,
-    },
-    {
-      email: testing_3,
-      name: testing_4,
-      title: testing_5,
-    },
-  ],
+  defaultFlow: extractFlows(data),
 };
 
 function App() {
-  this.form = FormApp.getActiveForm();
-  this.formUrl = this.form.getPublishedUrl();
-  this.url =
-    "https://script.google.com/macros/s/AKfycbxMGDGGVOkE1Icvd7aYWhudBSjHIZi45auB-Z_1sjhZ0Nb3yac9SDh-Q3DmyOcF6H7F/exec"; // IMPORTANT - copy the web app url after deploy
+  try {
+    this.form = call(FormApp.getActiveForm);
+    console.log(this.form);
+
+    this.formUrl = call(this.form.getPublishedUrl);
+    console.log(this.formUrl);
+    // Other code...
+  } catch (e) {
+    Logger.log("Error: " + e.toString());
+    // Handle the error or log more details.
+  }
+  // try{
+  //   this.formUrl = call(this.form.getPublishedUrl);
+  //   console.log(this.formUrl);
+  // }catch (e) {
+  //   Logger.log("Error: " + e.toString());
+  //   // Handle the error or log more details.
+  // }
+  // this.formUrl = this.form.getPublishedUrl(); //error on server creation URL
+  this.url = urlLink;
   this.title = this.form.getTitle();
   this.sheetname = "Form Responses 1"; // DO NOT change - the default google form responses sheet name
-  this.flowHeader = "Department"; // IMPORTANT - key field for your flows
   this.uidHeader = "UID";
   this.uidPrefix = "UID-";
   this.uidLength = 5;
   this.statusHeader = "Status";
   this.responseIdHeader = "_response_id";
-  this.emailHeader = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
+  this.documentLink = "Document Link";
+  this.emailHeader = emailAddressColumn;
 
   this.pending = "Pending";
   this.approved = "Approved";
   this.rejected = "Rejected";
   this.waiting = "Waiting";
 
+  console.log(FLOWS);
 
   //Get the details of the spreadsheet
   this.sheet = (() => {
@@ -100,6 +146,7 @@ function App() {
 
     let task, approver, nextApprover, column, approvers, email, status, responseId;
 
+    //If record is obtained, extract details
     if (record) {
       task = record.slice(0, headers.indexOf(this.statusHeader) + 1).map((item, i) => {
         return {
@@ -121,7 +168,7 @@ function App() {
 
   //Get response from spreadsheet based on ID
   this.getResponseById = (id) => {
-    
+
     const values = this.parsedValues();
     const record = values.find((value) => value.some((cell) => cell === id));
 
@@ -129,6 +176,7 @@ function App() {
 
     let task, approvers, status;
 
+    //If record is obtained, extract details
     if (record) {
       task = record.slice(0, headers.indexOf(this.statusHeader) + 1).map((item, i) => {
         return {
@@ -179,12 +227,12 @@ function App() {
 
     const options = { htmlBody: template_approval.evaluate().getContent() };
 
-    GmailApp.sendEmail(approver.email, subject, "", options);
+    MailApp.sendEmail(approver.email, subject, "", options);
   };
 
   //Sends a notification 
   this.sendNotification = (taskId) => {
- 
+
     const { email, responseId, status, task, approvers } = this.getTaskById(taskId);
     console.log({ email, status, task, approvers });
 
@@ -208,11 +256,10 @@ function App() {
 
     const options = { htmlBody: template_notification.evaluate().getContent() };
 
-    GmailApp.sendEmail(email, subject, "", options);
+    MailApp.sendEmail(email, subject, "", options);
   };
 
-  //IMPORTANT PROCESS
-  // add addtional data to form response when update
+  //!!IMPORTANT PROCESS!!
   //Handles the form submission and approval workflow
   this.onFormSubmit = () => {
 
@@ -225,13 +272,23 @@ function App() {
     const responses = this.form.getResponses();
     const lastResponse = responses[responses.length - 1];
     const responseId = lastResponse.getId();
-    const newHeaders = [this.uidHeader, this.statusHeader, this.responseIdHeader];
-    const newValues = [this.createUid(), this.pending, responseId];
 
-    const flowKey = values[lastRow - 1][headers.indexOf(this.flowHeader)];
-    const flow = FLOWS[flowKey] || FLOWS.defaultFlow;
+    const newHeaders = [this.uidHeader, this.statusHeader, this.responseIdHeader, this.documentLink];
+    const newValues = [this.createUid(), this.pending, responseId, ""];
+
+    // newHeaders.push(this.documentLink);
+    // newValues.push("");
+
+    const flow = FLOWS.defaultFlow;
+
+    // Utilities.sleep(3000);// Sleep for 3 second
+
     let taskId;
+
     flow.forEach((item, i) => {
+
+      // Utilities.sleep(3000);// Sleep for 3 second
+
       newHeaders.push("_approver_" + (i + 1));
 
       item.comments = null;
@@ -333,6 +390,22 @@ function doGet(_event) {
   const app = new App();
   let template;
 
+  const userEmail = Session.getActiveUser().getEmail();
+
+  console.log(userEmail);
+
+  const isValid = validate(userEmail, validDomain);
+
+  if (!isValid) {
+    const html = HtmlService.createTemplateFromFile("non_user.html")
+      .evaluate()
+      .setTitle("Unauhthorized Access")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+    return html;
+  }
+
   if (taskId) {
     template = HtmlService.createTemplateFromFile("index");
     const { task, approver, approvers, status } = app.getTaskById(taskId);
@@ -348,17 +421,16 @@ function doGet(_event) {
     template.task = task;
     template.status = status;
     template.approvers = approvers;
-
   }
+
   else {
     template = HtmlService.createTemplateFromFile("404.html");
   }
-
   template.title = app.title;
   template.pending = app.pending;
   template.approved = app.approved;
   template.rejected = app.rejected;
-  template.waiting = app.waiting;
+  template.waiting = app.waiting
 
   //Configuration for HTML output
   const htmlOutput = template.evaluate();
@@ -367,6 +439,11 @@ function doGet(_event) {
     .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   return htmlOutput;
+}
+
+function validate(email, domain) {
+  const userEmailDomain = email.split('@')[1];
+  return userEmailDomain === domain;
 }
 
 //Create a trigger for the form submission
@@ -384,4 +461,172 @@ function createTrigger() {
     .forForm(FormApp.getActiveForm())
     .onFormSubmit()
     .create();
+}
+
+//Custom menu on Google Form
+function onOpen(e) {
+  FormApp.getUi()
+    .createMenu('Other features')
+    .addItem('Create New Docs', 'createNewGoogleDocs')
+    .addItem('Convert Google Docs to PDFs', 'convertGoogleDocsToPDFs')
+    .addToUi();
+}
+
+//Replace the placeholders in the template with data from spreadsheet
+function replacePlaceholdersInDocument(body, placeholderMap) {
+  for (const placeholder in placeholderMap) {
+    if (placeholderMap.hasOwnProperty(placeholder)) {
+      body.replaceText(placeholder, placeholderMap[placeholder]);
+    }
+  }
+}
+
+//Replace the approver placeholders in the template with data from spreadsheet
+function replaceApproverPlaceholders(body, approverData, placeholderPrefix) {
+  const replacements = {
+    name: approverData.name,
+    title: approverData.title,
+    status: approverData.status,
+    comments: approverData.comments === null ? "" : approverData.comments,
+    timestamp: new Date(approverData.timestamp).toLocaleDateString(),
+  };
+
+  for (const [placeholder, value] of Object.entries(replacements)) {
+    const fullPlaceholder = `{${placeholderPrefix}.${placeholder}}`;
+    body.replaceText(fullPlaceholder, value);
+  }
+}
+
+//Creates the Google Docs using data from spreadsheet
+function createNewGoogleDocs() {
+  //!!IMPORTANT!! Ensure that the template and folder ID are entered in the row and column of the 'data' sheet
+  const googleDocTemplateID = data[1][3];
+  const folderID = data[1][4];
+
+  const googleDocTemplate = DriveApp.getFileById(googleDocTemplateID);
+  const destinationFolder = DriveApp.getFolderById(folderID)
+
+  //Store the sheet as variable
+  const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('Form Responses 1')
+
+  //Get all of the values as a 2D array
+  const rows = sheet.getDataRange().getValues();
+
+  const headers = rows[0];
+
+  const headerMap = {};
+
+  headers.forEach((header, columnIndex) => {
+    // Store the header with its corresponding column number
+    headerMap[header] = columnIndex;
+  });
+
+  //Processing each spreadsheet row
+  rows.forEach(function (row, index) {
+
+    // Extract headers from spreadsheet
+    const placeholderMap = {};
+    headers.forEach((header, index) => {
+      const placeholder = `{${header}}`;
+      placeholderMap[placeholder] = row[index];
+    });
+
+    const documentLinkColumnIndex = headerMap['Document Link'];
+    const documentLinkValue = row[documentLinkColumnIndex];
+    // console.log(row[documentLinkColumnIndex])
+
+    // Check if this row is the headers. If so, skip it
+    if (index === 0) return;
+
+    if (placeholderMap['{Status}'] == "Pending") return;
+
+    //Check if document link has been generated. If so, skip it
+    if (documentLinkValue) return;
+
+    //Title of the document in our destinationFolder
+    var emailAddress = placeholderMap[`{${emailAddressColumn}}`]
+    var username = emailAddress.substring(0, emailAddress.indexOf('@'))
+    const copy = googleDocTemplate.makeCopy(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} MANPOWER REQUISITION FORM`, destinationFolder)
+
+    const doc = DocumentApp.openById(copy.getId())
+    const body = doc.getBody();
+    replacePlaceholdersInDocument(body, placeholderMap);
+
+    //Get details of the approvers
+    for (let i = 1; i <= numOfApprovers; i++) {
+      const approverHeader = `_approver_${i}`;
+      const approverJSONString = placeholderMap[`{${approverHeader}}`];
+
+      // Check if the JSON string is not empty
+      if (approverJSONString && approverJSONString.trim() !== '') {
+        try {
+          const _approver_ = JSON.parse(approverJSONString);
+          replaceApproverPlaceholders(body, _approver_, approverHeader);
+        } catch (error) {
+          console.error(`Error parsing JSON for ${approverHeader}: ${error}`);
+          // Handle the error as needed (e.g., log, ignore, or take corrective action)
+        }
+      } else {
+        // Handle the case where the JSON string is empty
+        console.warn(`JSON string for ${approverHeader} is empty.`);
+        // You may want to decide what to do in this case (skip, log, etc.)
+      }
+    }
+
+    doc.saveAndClose();
+    const url = doc.getUrl();
+
+    sheet.getRange(index + 1, headerMap['Document Link'] + 1).setValue(url)
+  })
+}
+
+function convertGoogleDocsToPDFs() {
+  //Initialize Data folder ID and PDF folder ID
+  const datafolderID = data[1][4];
+  const pdfFolderID = data[1][5];
+
+  const dataFolder = DriveApp.getFolderById(datafolderID)
+  const pdfFolder = DriveApp.getFolderById(pdfFolderID);
+
+  console.log('PDF Folder ID: ' + pdfFolder);
+  console.log('Data Folder ID: ' + dataFolder);
+
+  const invoices = dataFolder.getFiles();
+  console.log('Files: ' + invoices);
+
+  const invoicesPDF = pdfFolder.getFiles();
+  console.log('PDF Files: ' + invoicesPDF);
+
+  var pdfNameArray = [];
+
+
+  while (invoicesPDF.hasNext()) {
+    var file = invoicesPDF.next();
+    var title = file.getName().replace('.pdf', '');
+    pdfNameArray.push(title);
+
+  }
+  console.log('PDF Names: ' + pdfNameArray);
+
+
+  while (invoices.hasNext()) {
+    var invoice = invoices.next();
+
+    var fileName = invoice.getName().replace('.pdf', '');
+    console.log(fileName);
+
+    if (pdfNameArray.includes(fileName)) {
+      console.log("The ID exists");
+    }
+    else {
+      console.log("The ID doesnt exist");
+      var id = invoice.getId();
+      var file = DriveApp.getFileById(id);
+
+      var PDFblob = file.getAs(MimeType.PDF);
+
+      var PDF = pdfFolder.createFile(PDFblob);
+
+    }
+  }
 }
