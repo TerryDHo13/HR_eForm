@@ -520,7 +520,7 @@ function createNewGoogleDocs() {
     // Check if this row is the headers. If so, skip it
     if (index === 0) return;
 
-    if (placeholderMap['{Status}'] == "Pending") return;
+    if (placeholderMap['{Status}'] != "Approved" || placeholderMap['{Status}'] != "Rejected") return;
 
     //Check if document link has been generated. If so, skip it
     if (documentLinkValue) return;
