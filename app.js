@@ -381,7 +381,7 @@ function doGet(_event) {
   if (!isValid) {
     const html = HtmlService.createTemplateFromFile("non_user.html")
       .evaluate()
-      .setTitle("Unauhthorized Access")
+      .setTitle("Unauthorized Access")
       .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
