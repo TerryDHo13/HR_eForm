@@ -381,7 +381,7 @@ function doGet(_event) {
   if (!isValid) {
     const html = HtmlService.createTemplateFromFile("non_user.html")
       .evaluate()
-      .setTitle("Unauhthorized Access")
+      .setTitle("Unauthorized Access")
       .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
@@ -520,10 +520,11 @@ function createNewGoogleDocs() {
     // Check if this row is the headers. If so, skip it
     if (index === 0) return;
 
-    if (placeholderMap['{Status}'] != "Approved" || placeholderMap['{Status}'] != "Rejected") return;
-
     //Check if document link has been generated. If so, skip it
     if (documentLinkValue) return;
+
+    //Check if 'Status' is 'Pending'. If so, skip it
+    if (placeholderMap['{Status}'] == 'Pending') return;
 
     //Title of the document in our destinationFolder
     var emailAddress = placeholderMap[`{${emailAddressColumn}}`]
