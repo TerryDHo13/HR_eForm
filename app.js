@@ -6,6 +6,9 @@ const urlLink = "YOUR_WEB_URL";
 const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
 const validDomain = 'YOUR_DOMAIN_NAME';
 
+const form = FormApp.getActiveForm();
+const formTitle = form.getTitle();
+
 const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('data');
 const data = sheet.getDataRange().getValues();
 numOfApprovers = 0;
@@ -529,7 +532,7 @@ function createNewGoogleDocs() {
     //Title of the document in our destinationFolder
     var emailAddress = placeholderMap[`{${emailAddressColumn}}`]
     var username = emailAddress.substring(0, emailAddress.indexOf('@'))
-    const copy = googleDocTemplate.makeCopy(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} MANPOWER REQUISITION FORM`, destinationFolder)
+    const copy = googleDocTemplate.makeCopy(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} ${formTitle}`, destinationFolder)
 
     const doc = DocumentApp.openById(copy.getId())
     const body = doc.getBody();
