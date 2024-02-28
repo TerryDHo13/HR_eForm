@@ -512,8 +512,20 @@ function createNewGoogleDocs() {
     // Extract headers from spreadsheet
     const placeholderMap = {};
     headers.forEach((header, index) => {
-      const placeholder = `{${header}}`;
+      // Check if the header contains any special characters
+      const containsSpecialChars = /[.*+?^${}()|[\]\\]/.test(header);
+
+      // Escape special characters only if necessary
+      const escapedHeader = containsSpecialChars ? header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : header;
+
+      // Construct the placeholder
+      const placeholder = `{${escapedHeader}}`;
+
+      // Assign the value to the placeholder map
       placeholderMap[placeholder] = row[index];
+
+      // Log the value assigned to the current placeholder
+      console.log(placeholderMap[placeholder]);
     });
 
     const documentLinkColumnIndex = headerMap['Document Link'];
