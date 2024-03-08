@@ -6,24 +6,26 @@ const urlLink = "YOUR_WEB_URL";
 const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
 const validDomain = 'YOUR_DOMAIN_NAME';
 
+// Get form title
 const form = FormApp.getActiveForm();
 const formTitle = form.getTitle();
 
+// Get data from sheet
 const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('data');
 const data = sheet.getDataRange().getValues();
 numOfApprovers = 0;
 
 const headers = data[0];
 
-//Columns for email, name, and title
+// Columns for email, name, and title
 const emailColumn = headers.indexOf('Email');
 const nameColumn = headers.indexOf('Name');
 const titleColumn = headers.indexOf('Title');
 
-//Extract approval flows from the "data" sheet
+// Extract approval flows from the "data" sheet
 function extractFlows(data) {
   const flows = [];
-  var numOfApproverRequired = data[1][6]
+  var numOfApproverRequired = data[1][4]
 
   for (let i = 1; i <= numOfApproverRequired; i++) {
     const flow = {
@@ -37,7 +39,7 @@ function extractFlows(data) {
   return flows;
 }
 
-//GAS Retry function
+// GAS Retry function
 function call(func, optLoggerFunction) {
   for (var n = 0; n < 6; n++) {
     try {
@@ -69,6 +71,7 @@ function App() {
   } catch (e) {
     Logger.log("Error: " + e.toString());
   }
+
   this.url = urlLink;
   this.title = this.form.getTitle();
   this.sheetname = "Form Responses 1"; // DO NOT change - the default google form responses sheet name
@@ -87,7 +90,7 @@ function App() {
 
   console.log(FLOWS);
 
-  //Get the details of the spreadsheet
+  // Get the details of the spreadsheet
   this.sheet = (() => {
 
     let sheet;
@@ -112,7 +115,7 @@ function App() {
     return sheet.getSheetByName(this.sheetname);
   })();
 
-  //Converts the data from spreadsheet to JSON
+  // Converts the data from spreadsheet to JSON
   this.parsedValues = () => {
 
     const parsedValues = this.sheet.getDataRange().getDisplayValues().map((value) => {
@@ -129,7 +132,7 @@ function App() {
     return parsedValues;
   };
 
-  //Get task from spreadsheet based on ID
+  // Get task from spreadsheet based on ID
   this.getTaskById = (id) => {
 
     const values = this.parsedValues();
@@ -141,7 +144,7 @@ function App() {
 
     let task, approver, nextApprover, column, approvers, email, status, responseId;
 
-    //If record is obtained, extract details
+    // If record is obtained, extract details
     if (record) {
       task = record.slice(0, headers.indexOf(this.statusHeader) + 1).map((item, i) => {
         return {
@@ -161,7 +164,7 @@ function App() {
     return { email, status, responseId, task, approver, nextApprover, approvers, row, column, statusColumn };
   };
 
-  //Get response from spreadsheet based on ID
+  // Get response from spreadsheet based on ID
   this.getResponseById = (id) => {
 
     const values = this.parsedValues();
@@ -186,7 +189,7 @@ function App() {
     return { task, approvers, status };
   };
 
-  //Create a unique ID for each form
+  // Create a unique ID for each form
   this.createUid = () => {
 
     const properties = PropertiesService.getDocumentProperties();
@@ -201,7 +204,7 @@ function App() {
     );
   };
 
-  //Creates and sends the approval email to approver
+  // Creates and sends the approval email to approver
   this.sendApproval = ({ task, approver, approvers }) => {
 
     const template_approval = HtmlService.createTemplateFromFile("approval_email.html");
@@ -225,7 +228,7 @@ function App() {
     MailApp.sendEmail(approver.email, subject, "", options);
   };
 
-  //Sends a notification 
+  // Sends a notification 
   this.sendNotification = (taskId) => {
 
     const { email, responseId, status, task, approvers } = this.getTaskById(taskId);
@@ -254,7 +257,7 @@ function App() {
   };
 
   //!!IMPORTANT PROCESS!!
-  //Handles the form submission and approval workflow
+  // Handles the form submission and approval workflow
   this.onFormSubmit = () => {
 
     const values = this.parsedValues();
@@ -310,7 +313,7 @@ function App() {
     this.sendApproval({ task, approver, approvers });
   };
 
-  //Approver approves the form
+  // Approver approves the form
   this.approve = ({ taskId, comments }) => {
     const { task, approver, approvers, nextApprover, row, column, statusColumn } = this.getTaskById(taskId);
 
@@ -333,7 +336,7 @@ function App() {
     }
   };
 
-  //Approver rejects the form
+  // Approver rejects the form
   this.reject = ({ taskId, comments }) => {
     const { approver, row, column, statusColumn } = this.getTaskById(taskId);
 
@@ -371,7 +374,7 @@ function include(filename) {
 }
 
 
-//Handles the display of the forms
+// Handles the display of the forms
 function doGet(_event) {
   const { taskId, responseId } = _event.parameter;
   const app = new App();
@@ -417,7 +420,7 @@ function doGet(_event) {
   template.rejected = app.rejected;
   template.waiting = app.waiting
 
-  //Configuration for HTML output
+  // Configuration for HTML output
   const htmlOutput = template.evaluate();
   htmlOutput
     .setTitle(app.title)
@@ -431,7 +434,7 @@ function validate(email, domain) {
   return userEmailDomain === domain;
 }
 
-//Create a trigger for the form submission
+// Create a trigger for the form submission
 function createTrigger() {
   const functionName = "_onFormSubmit";
   const triggers = ScriptApp.getProjectTriggers();
@@ -448,7 +451,7 @@ function createTrigger() {
     .create();
 }
 
-//Custom menu on Google Form
+// Custom menu on Google Form
 function onOpen(e) {
   FormApp.getUi()
     .createMenu('Other features')
@@ -457,7 +460,7 @@ function onOpen(e) {
     .addToUi();
 }
 
-//Replace the placeholders in the template with data from spreadsheet
+// Replace the placeholders in the template with data from spreadsheet
 function replacePlaceholdersInDocument(body, placeholderMap) {
   for (const placeholder in placeholderMap) {
     if (placeholderMap.hasOwnProperty(placeholder)) {
@@ -466,7 +469,7 @@ function replacePlaceholdersInDocument(body, placeholderMap) {
   }
 }
 
-//Replace the approver placeholders in the template with data from spreadsheet
+// Replace the approver placeholders in the template with data from spreadsheet
 function replaceApproverPlaceholders(body, approverData, placeholderPrefix) {
   const replacements = {
     name: approverData.name,
@@ -482,19 +485,50 @@ function replaceApproverPlaceholders(body, approverData, placeholderPrefix) {
   }
 }
 
-//Creates the Google Docs using data from spreadsheet
+// Check if folder exist in parent folder
+function folderExists(parentFolder, folderName) {
+  var folders = parentFolder.getFoldersByName(folderName);
+  return folders.hasNext();
+}
+
+// Creates the Google Docs using data from spreadsheet
 function createNewGoogleDocs() {
-  //!!IMPORTANT!! Ensure that the template and folder ID are entered in the row and column of the 'data' sheet
-  const googleDocTemplateID = data[1][3];
-  const folderID = data[1][4];
 
-  const googleDocTemplate = DriveApp.getFileById(googleDocTemplateID);
-  const destinationFolder = DriveApp.getFolderById(folderID)
+  var googleDocFolder = "Document";
+  var parentFolderId = data[1][3];
 
-  //Store the sheet as variable
+  // Get the parent folder
+  var parentFolder;
+  if (parentFolderId) {
+    try {
+      parentFolder = DriveApp.getFolderById(parentFolderId);
+    } catch (error) {
+      console.log("Folder '" + parentFolder + "' does not exist.");
+      return;
+    }
+  }
+
+  // Check and create Google Doc folder within the parent folder
+  if (!folderExists(parentFolder, googleDocFolder)) {
+    parentFolder.createFolder(googleDocFolder);
+  }
+
+  var docFolderIterator = parentFolder.getFoldersByName(googleDocFolder);
+  var docFolder;
+  if (docFolderIterator.hasNext()) {
+    docFolder = docFolderIterator.next();
+  } else {
+    console.log("Folder '" + googleDocFolder + "' does not exist.");
+    return;
+  }
+
+  const gDocFolderId = docFolder.getId();
+  var googleDocFolderId = DriveApp.getFolderById(gDocFolderId);
+
+  // Store the sheet as variable
   const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('Form Responses 1')
 
-  //Get all of the values as a 2D array
+  // Get all of the values as a 2D array
   const rows = sheet.getDataRange().getValues();
 
   const headers = rows[0];
@@ -502,17 +536,16 @@ function createNewGoogleDocs() {
   const headerMap = {};
 
   headers.forEach((header, columnIndex) => {
-    // Store the header with its corresponding column number
     headerMap[header] = columnIndex;
   });
 
-  //Processing each spreadsheet row
+  // Processing each spreadsheet row
   rows.forEach(function (row, index) {
 
-    // Extract headers from spreadsheet
+    // Get headers from spreadsheet
     const placeholderMap = {};
     headers.forEach((header, index) => {
-      // Check if the header contains any special characters
+      // Check if headers contains any special characters
       const containsSpecialChars = /[.*+?^${}()|[\]\\]/.test(header);
 
       // Escape special characters only if necessary
@@ -523,8 +556,6 @@ function createNewGoogleDocs() {
 
       // Assign the value to the placeholder map
       placeholderMap[placeholder] = row[index];
-
-      // Log the value assigned to the current placeholder
       console.log(placeholderMap[placeholder]);
     });
 
@@ -535,22 +566,78 @@ function createNewGoogleDocs() {
     // Check if this row is the headers. If so, skip it
     if (index === 0) return;
 
-    //Check if document link has been generated. If so, skip it
+    // Check if document link has been generated. If so, skip it
     if (documentLinkValue) return;
 
-    //Check if 'Status' is 'Pending'. If so, skip it
+    // Check if 'Status' is 'Pending'. If so, skip it
     if (placeholderMap['{Status}'] == 'Pending') return;
 
-    //Title of the document in our destinationFolder
+    // Title of the document in our destinationFolder
     var emailAddress = placeholderMap[`{${emailAddressColumn}}`]
     var username = emailAddress.substring(0, emailAddress.indexOf('@'))
-    const copy = googleDocTemplate.makeCopy(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} ${formTitle}`, destinationFolder)
 
-    const doc = DocumentApp.openById(copy.getId())
+    // Create Doc Template
+    var doc = DocumentApp.create(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} MANPOWER REQUISITION FORM`);
+    var file = DriveApp.getFileById(doc.getId()); // Get the file corresponding to the newly created document
+    file.moveTo(googleDocFolderId); // Move the file to the target folder
+
     const body = doc.getBody();
+
+    var titleParagraph = body.appendParagraph(formTitle + " Title");
+    titleParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    titleParagraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    titleParagraph.setFontFamily('Arial');
+
+    var table = body.appendTable();
+    var headersForDoc = headers.slice(0, headerMap['Document Link'] - 1);
+
+    var placeholderForDoc = headersForDoc.map(function (headerForDoc) {
+      return '{' + headerForDoc + '}';
+    });
+
+    var numofRows1 = headersForDoc.length;
+    var numofColumns1 = 2;
+
+    for (var row = 0; row < numofRows1; row++) {
+      var tableRow = table.appendTableRow();
+      for (var col = 0; col < numofColumns1; col++) {
+        if (col == 0) {
+          var headerCell = tableRow.appendTableCell();
+          headerCell.setText(headersForDoc[row]);
+        }
+        else {
+          var headerCell = tableRow.appendTableCell();
+          headerCell.setText(placeholderForDoc[row]);
+        }
+      }
+    }
+    var titleParagraph2 = body.appendParagraph("Approver Details");
+    titleParagraph2.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    titleParagraph2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    titleParagraph2.setFontFamily('Arial');
+
+    var table = body.appendTable();
+    var headers2 = ['Approver', 'Title', 'Status', 'Comment', 'Timestamp'];
+    var placeHolders2 = ['{_approver_1.name}', '{_approver_1.title}', '{_approver_1.status}', '{_approver_1.comments}', '{_approver_1.timestamp}'];
+
+    // Add header row
+    var headerRow = table.appendTableRow();
+    headers2.forEach(function (header) {
+      headerRow.appendTableCell().setText(header);
+    });
+
+    // Add rows for approver details
+    for (var i = 1; i <= numOfApprovers; i++) {
+      var approverRow = table.appendTableRow();
+      placeHolders2.forEach(function (placeholder) {
+        var approverDetails = placeholder.replace('_approver_1', `_approver_${i}`);
+        approverRow.appendTableCell().setText(approverDetails);
+      });
+    }
+
     replacePlaceholdersInDocument(body, placeholderMap);
 
-    //Get details of the approvers
+    // Get details of the approvers
     for (let i = 1; i <= numOfApprovers; i++) {
       const approverHeader = `_approver_${i}`;
       const approverJSONString = placeholderMap[`{${approverHeader}}`];
@@ -578,18 +665,59 @@ function createNewGoogleDocs() {
   })
 }
 
-//Create PDF from Google Docs
+// Create PDF from Google Docs
 function convertGoogleDocsToPDFs() {
-  //Initialize Data folder ID and PDF folder ID
-  const datafolderID = data[1][4];
-  const pdfFolderID = data[1][5];
+  var pdfFolderName = "Pdf"; // Names of the child folders
+  var googleDocFolderName = "Document";
+  var parentFolderId = data[1][3];
 
-  const dataFolder = DriveApp.getFolderById(datafolderID)
-  const pdfFolder = DriveApp.getFolderById(pdfFolderID);
+  // Get the parent folder
+  if (parentFolderId) {
+    try {
+      parentFolder = DriveApp.getFolderById(parentFolderId);
+    } catch (error) {
+      console.log("Folder with ID '" + parentFolderId + "' could not be retrieved.");
+      return;
+    }
+  }
 
-  const invoices = dataFolder.getFiles();
+  // Check and create Pdf folder within the parent folder
+  if (!folderExists(parentFolder, pdfFolderName)) {
+    parentFolder.createFolder(pdfFolderName);
+  }
 
-  const invoicesPDF = pdfFolder.getFiles();
+  var pdfFolderIterator = parentFolder.getFoldersByName(pdfFolderName);
+  var pdfFolder;
+  if (pdfFolderIterator.hasNext()) {
+    pdfFolder = pdfFolderIterator.next();
+  } else {
+    console.log("Folder '" + pdfFolderName + "' does not exist.");
+    return;
+  }
+
+  const pdfFolderId = pdfFolder.getId();
+
+  // Check if the data folder exist
+  if (!folderExists(parentFolder, googleDocFolderName)) {
+    console.log("Folder '" + googleDocFolderName + "' does not exist.");
+    return;
+  } else {
+    var googleDocFolderIterator = parentFolder.getFoldersByName(googleDocFolderName);
+    var googleDocFolder;
+    if (googleDocFolderIterator.hasNext()) {
+      googleDocFolder = googleDocFolderIterator.next();
+    }
+  }
+
+  const gDocFolderId = googleDocFolder.getId();
+
+  const googleDoc_Folder = DriveApp.getFolderById(gDocFolderId);
+  const pdf_folder = DriveApp.getFolderById(pdfFolderId);
+
+
+  const invoices = googleDoc_Folder.getFiles();
+
+  const invoicesPDF = pdf_folder.getFiles();
 
   var pdfNameArray = [];
 
@@ -615,9 +743,7 @@ function convertGoogleDocsToPDFs() {
       var file = DriveApp.getFileById(id);
 
       var PDFblob = file.getAs(MimeType.PDF);
-
-      var PDF = pdfFolder.createFile(PDFblob);
-
+      pdfFolder.createFile(PDFblob);
     }
   }
 }
