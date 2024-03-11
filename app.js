@@ -3,6 +3,7 @@
 //!!IMPORTANT!! - copy the web app url after deploy
 const SHEETID = 'YOUR_SHEET_ID';
 const urlLink = "YOUR_WEB_URL";
+const logoId = "IMAGE_LOGO_ID";
 const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
 const validDomain = 'YOUR_DOMAIN_NAME';
 
@@ -582,6 +583,15 @@ function createNewGoogleDocs() {
     file.moveTo(googleDocFolderId); // Move the file to the target folder
 
     const body = doc.getBody();
+
+    var img = DriveApp.getFileById(logoId).getBlob();
+
+    // Insert the image into the document
+    var image = body.appendImage(img);
+    var imageStyles = {};
+    imageStyles[DocumentApp.Attribute.HORIZONTAL_ALIGNMENT] = DocumentApp.HorizontalAlignment.CENTER;
+    imageStyles[image.setWidth(180).setHeight(80)];
+    image.getParent().setAttributes(imageStyles);
 
     var titleParagraph = body.appendParagraph(formTitle + " Title");
     titleParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING1);
