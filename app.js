@@ -1,20 +1,20 @@
 //!!IMPORTANT!! Ensure SHEETID is correct 
-//!!IMPORTANT!! Ensure that 'data' sheet contains the approver details, template ID and Folder ID
-//!!IMPORTANT!! - copy the web app url after deploy
+//!!IMPORTANT!! Copy the web app url after deploy
 const SHEETID = 'YOUR_SHEET_ID';
 const urlLink = "YOUR_WEB_URL";
-const logoId = "IMAGE_LOGO_ID";
-const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
-const validDomain = 'YOUR_DOMAIN_NAME';
-
-// Get form title
-const form = FormApp.getActiveForm();
-const formTitle = form.getTitle();
 
 // Get data from sheet
 const sheet = SpreadsheetApp.openById(SHEETID).getSheetByName('data');
 const data = sheet.getDataRange().getValues();
 numOfApprovers = 0;
+
+const logoId = data[1][4]; // Image Logo Id 
+const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
+const validDomain = 'YOUR_DOMAIN_NAME'; // Enter valid domain 
+
+// Get form title
+const form = FormApp.getActiveForm();
+const formTitle = form.getTitle();
 
 const headers = data[0];
 
@@ -26,7 +26,7 @@ const titleColumn = headers.indexOf('Title');
 // Extract approval flows from the "data" sheet
 function extractFlows(data) {
   const flows = [];
-  var numOfApproverRequired = data[1][4]
+  var numOfApproverRequired = data[1][5]
 
   for (let i = 1; i <= numOfApproverRequired; i++) {
     const flow = {
@@ -452,15 +452,6 @@ function createTrigger() {
     .create();
 }
 
-// Custom menu on Google Form
-function onOpen(e) {
-  FormApp.getUi()
-    .createMenu('Other features')
-    .addItem('Create New Docs', 'createNewGoogleDocs')
-    .addItem('Convert Google Docs to PDFs', 'convertGoogleDocsToPDFs')
-    .addToUi();
-}
-
 // Replace the placeholders in the template with data from spreadsheet
 function replacePlaceholdersInDocument(body, placeholderMap) {
   for (const placeholder in placeholderMap) {
@@ -578,7 +569,7 @@ function createNewGoogleDocs() {
     var username = emailAddress.substring(0, emailAddress.indexOf('@'))
 
     // Create Doc Template
-    var doc = DocumentApp.create(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} MANPOWER REQUISITION FORM`);
+    var doc = DocumentApp.create(`${username}, ${new Date(placeholderMap['{Timestamp}']).toLocaleString()} ${formTitle}`);
     var file = DriveApp.getFileById(doc.getId()); // Get the file corresponding to the newly created document
     file.moveTo(googleDocFolderId); // Move the file to the target folder
 
@@ -593,24 +584,24 @@ function createNewGoogleDocs() {
     imageStyles[image.setWidth(180).setHeight(80)];
     image.getParent().setAttributes(imageStyles);
 
-    var titleParagraph = body.appendParagraph(formTitle + " Title");
+    var titleParagraph = body.appendParagraph(formTitle);
     titleParagraph.setHeading(DocumentApp.ParagraphHeading.HEADING1);
     titleParagraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
     titleParagraph.setFontFamily('Arial');
 
-    var table = body.appendTable();
+    var dataTable = body.appendTable();
     var headersForDoc = headers.slice(0, headerMap['Document Link'] - 1);
 
     var placeholderForDoc = headersForDoc.map(function (headerForDoc) {
       return '{' + headerForDoc + '}';
     });
 
-    var numofRows1 = headersForDoc.length;
-    var numofColumns1 = 2;
+    var numofRowsData = headersForDoc.length;
+    var numofColumnsData = 2;
 
-    for (var row = 0; row < numofRows1; row++) {
-      var tableRow = table.appendTableRow();
-      for (var col = 0; col < numofColumns1; col++) {
+    for (var row = 0; row < numofRowsData; row++) {
+      var tableRow = dataTable.appendTableRow();
+      for (var col = 0; col < numofColumnsData; col++) {
         if (col == 0) {
           var headerCell = tableRow.appendTableCell();
           headerCell.setText(headersForDoc[row]);
@@ -626,19 +617,19 @@ function createNewGoogleDocs() {
     titleParagraph2.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
     titleParagraph2.setFontFamily('Arial');
 
-    var table = body.appendTable();
+    var approverTable = body.appendTable();
     var headers2 = ['Approver', 'Title', 'Status', 'Comment', 'Timestamp'];
     var placeHolders2 = ['{_approver_1.name}', '{_approver_1.title}', '{_approver_1.status}', '{_approver_1.comments}', '{_approver_1.timestamp}'];
 
     // Add header row
-    var headerRow = table.appendTableRow();
+    var headerRow = approverTable.appendTableRow();
     headers2.forEach(function (header) {
       headerRow.appendTableCell().setText(header);
     });
 
     // Add rows for approver details
     for (var i = 1; i <= numOfApprovers; i++) {
-      var approverRow = table.appendTableRow();
+      var approverRow = approverTable.appendTableRow();
       placeHolders2.forEach(function (placeholder) {
         var approverDetails = placeholder.replace('_approver_1', `_approver_${i}`);
         approverRow.appendTableCell().setText(approverDetails);
@@ -664,7 +655,6 @@ function createNewGoogleDocs() {
       } else {
         // Handle the case where the JSON string is empty
         console.warn(`JSON string for ${approverHeader} is empty.`);
-        // You may want to decide what to do in this case (skip, log, etc.)
       }
     }
 
