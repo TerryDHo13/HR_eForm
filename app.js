@@ -10,7 +10,6 @@ numOfApprovers = 0;
 
 const logoId = data[1][4]; // Image Logo Id 
 const emailAddressColumn = "Email Address"; // DO NOT CHANGE - make sure email collection is enabled in Google Form
-const validDomain = 'YOUR_DOMAIN_NAME'; // Enter valid domain 
 
 // Get form title
 const form = FormApp.getActiveForm();
