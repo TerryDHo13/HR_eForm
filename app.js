@@ -381,20 +381,6 @@ function doGet(_event) {
   const app = new App();
   let template;
 
-  const userEmail = Session.getActiveUser().getEmail();
-
-  const isValid = validate(userEmail, validDomain);
-
-  if (!isValid) {
-    const html = HtmlService.createTemplateFromFile("non_user.html")
-      .evaluate()
-      .setTitle("Unauthorized Access")
-      .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-
-    return html;
-  }
-
   if (taskId) {
     template = HtmlService.createTemplateFromFile("index");
     const { task, approver, approvers, status } = app.getTaskById(taskId);
@@ -428,11 +414,6 @@ function doGet(_event) {
     .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   return htmlOutput;
-}
-
-function validate(email, domain) {
-  const userEmailDomain = email.split('@')[1];
-  return userEmailDomain === domain;
 }
 
 // Create a trigger for the form submission
